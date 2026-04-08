@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>FingerFly</title>
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d0d12;--surface:#16161e;--border:#2a2a3a;
+    --accent:#8b5cf6;--accent-glow:rgba(139,92,246,.45);
+    --text:#e2e2e8;--text-dim:#6b6b80;--green:#22c55e;--red:#ef4444;
+  }
+  html,body{
+    height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+    font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+    -webkit-user-select:none;user-select:none;touch-action:none;
+  }
+  body{display:flex;flex-direction:column}
+
+  /* Header */
+  .header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;border-bottom:1px solid var(--border);
+    flex-shrink:0;background:var(--surface);
+  }
+  .header-left{display:flex;align-items:center;gap:10px}
+  .logo{width:28px;height:28px;border-radius:6px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+  .header h1{font-size:15px;font-weight:600;letter-spacing:.5px}
+  .status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)}
+  .status-dot{
+    width:8px;height:8px;border-radius:50%;background:var(--red);
+    transition:background .3s;
+  }
+  .status-dot.connected{
+    background:var(--green);
+    box-shadow:0 0 6px var(--green),0 0 12px rgba(34,197,94,.3);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+  /* Trackpad */
+  .trackpad{
+    flex:1;position:relative;overflow:hidden;
+    background:
+      linear-gradient(var(--border) 1px,transparent 1px),
+      linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:40px 40px;
+    background-color:var(--bg);
+  }
+  .trackpad-label{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:13px;color:var(--text-dim);opacity:.35;pointer-events:none;
+    letter-spacing:2px;text-transform:uppercase;
+  }
+  .scroll-indicator{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    background:var(--accent);color:#fff;padding:4px 14px;border-radius:12px;
+    font-size:11px;font-weight:600;letter-spacing:1px;
+    opacity:0;transition:opacity .15s;pointer-events:none;
+  }
+  .scroll-indicator.visible{opacity:.85}
+
+  /* Gesture toast */
+  .gesture-toast{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);
+    background:rgba(139,92,246,.9);color:#fff;padding:10px 22px;border-radius:14px;
+    font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+    pointer-events:none;opacity:0;
+    transition:opacity .2s, transform .2s;z-index:5;
+    text-align:center;white-space:nowrap;
+  }
+  .gesture-toast.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+  /* Finger count badge */
+  .finger-badge{
+    position:absolute;top:14px;right:14px;
+    background:var(--surface);border:1px solid var(--border);
+    color:var(--text-dim);padding:3px 10px;border-radius:10px;
+    font-size:10px;font-weight:600;letter-spacing:.5px;
+    pointer-events:none;opacity:0;transition:opacity .15s;
+  }
+  .finger-badge.visible{opacity:.8}
+
+  /* Touch indicators */
+  .touch-dot{
+    position:absolute;width:60px;height:60px;border-radius:50%;
+    background:rgba(139,92,246,.18);border:1.5px solid rgba(139,92,246,.35);
+    transform:translate(-50%,-50%);pointer-events:none;
+    transition:opacity .15s;
+  }
+  .ripple{
+    position:absolute;width:60px;height:60px;border-radius:50%;
+    background:rgba(139,92,246,.25);transform:translate(-50%,-50%) scale(0);
+    pointer-events:none;animation:ripple-out .4s ease-out forwards;
+  }
+  @keyframes ripple-out{to{transform:translate(-50%,-50%) scale(2.5);opacity:0}}
+
+  /* Buttons */
+  .buttons{
+    display:flex;border-top:1px solid var(--border);flex-shrink:0;
+    background:var(--surface);
+  }
+  .btn{
+    flex:1;padding:18px 0;text-align:center;font-size:12px;font-weight:600;
+    letter-spacing:1px;color:var(--text-dim);
+    border:none;background:transparent;cursor:pointer;
+    transition:background .15s,color .15s;
+    font-family:inherit;
+  }
+  .btn:active{background:rgba(139,92,246,.15);color:var(--accent)}
+  .btn-settings{max-width:64px;font-size:18px}
+  .btn+.btn{border-left:1px solid var(--border)}
+
+  /* Settings Panel */
+  .settings-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.5);
+    opacity:0;pointer-events:none;transition:opacity .25s;z-index:10;
+  }
+  .settings-overlay.open{opacity:1;pointer-events:auto}
+  .settings-panel{
+    position:fixed;bottom:0;left:0;right:0;
+    background:var(--surface);border-top:1px solid var(--border);
+    border-radius:16px 16px 0 0;padding:20px 20px 32px;
+    transform:translateY(100%);transition:transform .3s ease;z-index:11;
+  }
+  .settings-panel.open{transform:translateY(0)}
+  .settings-panel h2{font-size:14px;margin-bottom:16px;letter-spacing:.5px}
+  .setting-row{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .setting-row label{font-size:12px;color:var(--text-dim)}
+  .setting-row .val{font-size:12px;color:var(--accent);min-width:36px;text-align:right}
+  input[type=range]{
+    width:140px;accent-color:var(--accent);background:transparent;
+  }
+  .toggle{
+    width:44px;height:24px;border-radius:12px;background:var(--border);
+    position:relative;cursor:pointer;transition:background .2s;border:none;
+  }
+  .toggle.on{background:var(--accent)}
+  .toggle::after{
+    content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
+    border-radius:50%;background:#fff;transition:transform .2s;
+  }
+  .toggle.on::after{transform:translateX(20px)}
+  .settings-close{
+    margin-top:8px;width:100%;padding:12px;border-radius:10px;
+    background:var(--accent);color:#fff;border:none;font-weight:600;
+    font-size:13px;cursor:pointer;font-family:inherit;letter-spacing:.5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">F</div>
+    <h1>FingerFly</h1>
+  </div>
+  <div class="status">
+    <span id="statusText">Disconnected</span>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
+</div>
+
+<!-- Trackpad Surface -->
+<div class="trackpad" id="trackpad">
+  <div class="trackpad-label">FingerFly</div>
+  <div class="scroll-indicator" id="scrollInd">SCROLL</div>
+  <div class="gesture-toast" id="gestureToast"></div>
+  <div class="finger-badge" id="fingerBadge"></div>
+</div>
+
+<!-- Bottom Buttons -->
+<div class="buttons">
+  <button class="btn" id="btnLeft">LEFT CLICK</button>
+  <button class="btn btn-settings" id="btnSettings">&#9881;</button>
+  <button class="btn" id="btnRight">RIGHT CLICK</button>
+</div>
+
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settingsOverlay"></div>
+<div class="settings-panel" id="settingsPanel">
+  <h2>Settings</h2>
+  <div class="setting-row">
+    <label>Sensitivity</label>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="range" id="senSlider" min="0.5" max="5" step="0.1" value="2">
+      <span class="val" id="senVal">2.0x</span>
+    </div>
+  </div>
+  <div class="setting-row">
+    <label>Scroll Speed</label>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="range" id="scrSlider" min="0.1" max="3" step="0.1" value="1">
+      <span class="val" id="scrVal">1.0x</span>
+    </div>
+  </div>
+  <div class="setting-row">
+    <label>Tap to Click</label>
+    <button class="toggle on" id="tapToggle"></button>
+  </div>
+  <button class="settings-close" id="settingsClose">Done</button>
+</div>
+
+<script>
+(function(){
+  // --- State ---
+  let ws = null;
+  let connected = false;
+  let tapToClick = true;
+  const touches = {};       // id -> {x, y, startX, startY, startTime, moved}
+  let touchCount = 0;
+  let maxTouches = 0;
+  let scrolling = false;
+
+  // --- Smoothing state ---
+  const SMOOTH = 0.45;
+  let rawDx = 0, rawDy = 0;
+  let smoothDx = 0, smoothDy = 0;
+  let rawScrollDx = 0, rawScrollDy = 0;
+  let smoothScrollDx = 0, smoothScrollDy = 0;
+  let hasMoveData = false;
+  let hasScrollData = false;
+  let rafId = null;
+
+  // --- Multi-finger gesture state ---
+  let gestureStartTime = 0;
+  let gestureTotalDx = 0, gestureTotalDy = 0; // accumulated swipe distance for 3+ finger gestures
+  let gestureFired = false;     // only fire one gesture per touch sequence
+  let gestureToastTimer = null;
+  const GESTURE_THRESHOLD = 60; // px of total swipe before gesture triggers
+  // 4-finger pinch
+  let pinchStartSpread = 0;
+
+  // --- Elements ---
+  const trackpad      = document.getElementById('trackpad');
+  const statusDot     = document.getElementById('statusDot');
+  const statusText    = document.getElementById('statusText');
+  const scrollInd     = document.getElementById('scrollInd');
+  const gestureToast  = document.getElementById('gestureToast');
+  const fingerBadge   = document.getElementById('fingerBadge');
+  const btnLeft       = document.getElementById('btnLeft');
+  const btnRight      = document.getElementById('btnRight');
+  const btnSettings   = document.getElementById('btnSettings');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsPanel   = document.getElementById('settingsPanel');
+  const settingsClose   = document.getElementById('settingsClose');
+  const senSlider     = document.getElementById('senSlider');
+  const senVal        = document.getElementById('senVal');
+  const scrSlider     = document.getElementById('scrSlider');
+  const scrVal        = document.getElementById('scrVal');
+  const tapToggle     = document.getElementById('tapToggle');
+
+  // --- WebSocket ---
+  function connect(){
+    const url = 'ws://' + location.hostname + ':8081';
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => {
+      connected = true;
+      statusDot.classList.add('connected');
+      statusText.textContent = 'Connected';
+    };
+    ws.onclose = () => {
+      connected = false;
+      statusDot.classList.remove('connected');
+      statusText.textContent = 'Disconnected';
+      setTimeout(connect, 2000);
+    };
+    ws.onerror = () => ws.close();
+  }
+  connect();
+
+  function send(obj){
+    if(ws && ws.readyState === WebSocket.OPEN){
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  // --- Gesture toast ---
+  function showGestureToast(text){
+    if(gestureToastTimer) clearTimeout(gestureToastTimer);
+    gestureToast.textContent = text;
+    gestureToast.classList.add('visible');
+    try{ navigator.vibrate(20); }catch(_){}
+    gestureToastTimer = setTimeout(() => {
+      gestureToast.classList.remove('visible');
+    }, 800);
+  }
+
+  // --- Finger badge ---
+  function updateFingerBadge(count){
+    if(count >= 2){
+      fingerBadge.textContent = count + ' fingers';
+      fingerBadge.classList.add('visible');
+    } else {
+      fingerBadge.classList.remove('visible');
+    }
+  }
+
+  // --- Pinch spread calculation ---
+  function getTouchSpread(touchList){
+    if(touchList.length < 2) return 0;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for(let i = 0; i < touchList.length; i++){
+      const t = touchList[i];
+      if(t.clientX < minX) minX = t.clientX;
+      if(t.clientX > maxX) maxX = t.clientX;
+      if(t.clientY < minY) minY = t.clientY;
+      if(t.clientY > maxY) maxY = t.clientY;
+    }
+    return Math.hypot(maxX - minX, maxY - minY);
+  }
+
+  // --- RAF loop ---
+  function tick(){
+    rafId = requestAnimationFrame(tick);
+
+    if(hasMoveData){
+      smoothDx = smoothDx * (1 - SMOOTH) + rawDx * SMOOTH;
+      smoothDy = smoothDy * (1 - SMOOTH) + rawDy * SMOOTH;
+      rawDx = 0; rawDy = 0;
+      if(Math.abs(smoothDx) > 0.15 || Math.abs(smoothDy) > 0.15){
+        send({action:'move', dx: smoothDx, dy: smoothDy});
+      } else {
+        smoothDx = 0; smoothDy = 0;
+        hasMoveData = false;
+      }
+    }
+
+    if(hasScrollData){
+      smoothScrollDx = smoothScrollDx * (1 - SMOOTH) + rawScrollDx * SMOOTH;
+      smoothScrollDy = smoothScrollDy * (1 - SMOOTH) + rawScrollDy * SMOOTH;
+      rawScrollDx = 0; rawScrollDy = 0;
+      if(Math.abs(smoothScrollDx) > 0.1 || Math.abs(smoothScrollDy) > 0.1){
+        send({action:'scroll', dx: smoothScrollDx, dy: smoothScrollDy});
+      } else {
+        smoothScrollDx = 0; smoothScrollDy = 0;
+        hasScrollData = false;
+      }
+    }
+  }
+  rafId = requestAnimationFrame(tick);
+
+  // --- Touch indicator helpers ---
+  function showDot(id, x, y){
+    let dot = document.getElementById('td-'+id);
+    if(!dot){
+      dot = document.createElement('div');
+      dot.className = 'touch-dot';
+      dot.id = 'td-'+id;
+      trackpad.appendChild(dot);
+    }
+    const r = trackpad.getBoundingClientRect();
+    dot.style.left = (x - r.left) + 'px';
+    dot.style.top  = (y - r.top) + 'px';
+    dot.style.opacity = '1';
+  }
+  function hideDot(id){
+    const dot = document.getElementById('td-'+id);
+    if(dot) dot.remove();
+  }
+  function spawnRipple(x, y){
+    const rip = document.createElement('div');
+    rip.className = 'ripple';
+    const r = trackpad.getBoundingClientRect();
+    rip.style.left = (x - r.left) + 'px';
+    rip.style.top  = (y - r.top) + 'px';
+    trackpad.appendChild(rip);
+    rip.addEventListener('animationend', () => rip.remove());
+  }
+
+  // --- Touch events ---
+  trackpad.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    for(let t of e.changedTouches){
+      touches[t.identifier] = {
+        x: t.clientX, y: t.clientY,
+        startX: t.clientX, startY: t.clientY,
+        startTime: Date.now(), moved: false
+      };
+      showDot(t.identifier, t.clientX, t.clientY);
+    }
+    touchCount = e.touches.length;
+    if(touchCount > maxTouches) maxTouches = touchCount;
+    updateFingerBadge(touchCount);
+
+    // 2-finger = scroll
+    if(touchCount === 2 && maxTouches === 2){
+      scrolling = true;
+      scrollInd.classList.add('visible');
+      smoothScrollDx = 0; smoothScrollDy = 0;
+    }
+
+    // 3+ fingers = gesture mode — reset gesture tracking
+    if(touchCount >= 3){
+      scrolling = false;
+      scrollInd.classList.remove('visible');
+      gestureTotalDx = 0;
+      gestureTotalDy = 0;
+      gestureFired = false;
+      gestureStartTime = Date.now();
+    }
+
+    // 4+ fingers — track pinch spread
+    if(touchCount >= 4){
+      pinchStartSpread = getTouchSpread(e.touches);
+    }
+
+    // Reset smooth state on new gesture
+    if(touchCount === 1 && !scrolling){
+      smoothDx = 0; smoothDy = 0;
+    }
+  }, {passive:false});
+
+  trackpad.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    let dxSum = 0, dySum = 0, n = 0;
+    for(let t of e.changedTouches){
+      const prev = touches[t.identifier];
+      if(!prev) continue;
+      const dx = t.clientX - prev.x;
+      const dy = t.clientY - prev.y;
+      dxSum += dx; dySum += dy; n++;
+      const dist = Math.hypot(t.clientX - prev.startX, t.clientY - prev.startY);
+      if(dist > 10) prev.moved = true;
+      prev.x = t.clientX;
+      prev.y = t.clientY;
+      showDot(t.identifier, t.clientX, t.clientY);
+    }
+    if(n === 0) return;
+    const dx = dxSum / n;
+    const dy = dySum / n;
+
+    // --- 3-finger swipe gestures ---
+    if(maxTouches === 3 && touchCount >= 3 && !gestureFired){
+      gestureTotalDx += dx;
+      gestureTotalDy += dy;
+      const absDx = Math.abs(gestureTotalDx);
+      const absDy = Math.abs(gestureTotalDy);
+
+      if(absDx > GESTURE_THRESHOLD || absDy > GESTURE_THRESHOLD){
+        gestureFired = true;
+        if(absDx > absDy){
+          // Horizontal swipe
+          if(gestureTotalDx > 0){
+            send({action:'space_right'});
+            showGestureToast('Space >>');
+          } else {
+            send({action:'space_left'});
+            showGestureToast('<< Space');
+          }
+        } else {
+          // Vertical swipe
+          if(gestureTotalDy < 0){
+            send({action:'mission_control'});
+            showGestureToast('Mission Control');
+          } else {
+            send({action:'app_expose'});
+            showGestureToast('App Expose');
+          }
+        }
+      }
+      return; // don't send move/scroll during gesture
+    }
+
+    // --- 4-finger pinch gesture ---
+    if(maxTouches >= 4 && touchCount >= 4 && !gestureFired){
+      const currentSpread = getTouchSpread(e.touches);
+      const delta = currentSpread - pinchStartSpread;
+      if(Math.abs(delta) > 80){
+        gestureFired = true;
+        if(delta < 0){
+          // Pinch in
+          send({action:'launchpad'});
+          showGestureToast('Launchpad');
+        } else {
+          // Pinch out / spread
+          send({action:'show_desktop'});
+          showGestureToast('Show Desktop');
+        }
+      }
+      // Also accumulate swipe for 4-finger horizontal swipe (spaces)
+      gestureTotalDx += dx;
+      gestureTotalDy += dy;
+      const absDx = Math.abs(gestureTotalDx);
+      const absDy = Math.abs(gestureTotalDy);
+      if(!gestureFired && absDx > GESTURE_THRESHOLD && absDx > absDy){
+        gestureFired = true;
+        if(gestureTotalDx > 0){
+          send({action:'space_right'});
+          showGestureToast('Space >>');
+        } else {
+          send({action:'space_left'});
+          showGestureToast('<< Space');
+        }
+      }
+      return;
+    }
+
+    // --- Normal 2-finger scroll ---
+    if(scrolling && maxTouches === 2){
+      rawScrollDx += -dx;
+      rawScrollDy += -dy;
+      hasScrollData = true;
+      return;
+    }
+
+    // --- 1-finger move ---
+    if(maxTouches === 1){
+      rawDx += dx;
+      rawDy += dy;
+      hasMoveData = true;
+    }
+  }, {passive:false});
+
+  trackpad.addEventListener('touchend', function(e){
+    e.preventDefault();
+    for(let t of e.changedTouches){
+      const prev = touches[t.identifier];
+      if(prev && tapToClick && !gestureFired){
+        const elapsed = Date.now() - prev.startTime;
+        if(elapsed < 200 && !prev.moved){
+          if(maxTouches >= 2){
+            send({action:'rightclick'});
+          } else {
+            send({action:'click'});
+          }
+          spawnRipple(t.clientX, t.clientY);
+          try{ navigator.vibrate(10); }catch(_){}
+        }
+      }
+      hideDot(t.identifier);
+      delete touches[t.identifier];
+    }
+    touchCount = e.touches.length;
+    updateFingerBadge(touchCount);
+    if(touchCount === 0){
+      maxTouches = 0;
+      scrolling = false;
+      gestureFired = false;
+      gestureTotalDx = 0;
+      gestureTotalDy = 0;
+      scrollInd.classList.remove('visible');
+    }
+  }, {passive:false});
+
+  trackpad.addEventListener('touchcancel', function(e){
+    e.preventDefault();
+    for(let t of e.changedTouches){
+      hideDot(t.identifier);
+      delete touches[t.identifier];
+    }
+    touchCount = e.touches.length;
+    updateFingerBadge(touchCount);
+    if(touchCount === 0){
+      maxTouches = 0;
+      scrolling = false;
+      gestureFired = false;
+      gestureTotalDx = 0;
+      gestureTotalDy = 0;
+      scrollInd.classList.remove('visible');
+    }
+  }, {passive:false});
+
+  // Block iOS gestures
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('gesturechange', e => e.preventDefault());
+  document.addEventListener('gestureend', e => e.preventDefault());
+
+  // --- Buttons ---
+  btnLeft.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    send({action:'click'});
+    try{ navigator.vibrate(10); }catch(_){}
+  }, {passive:false});
+  btnRight.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    send({action:'rightclick'});
+    try{ navigator.vibrate(10); }catch(_){}
+  }, {passive:false});
+
+  // --- Settings ---
+  function openSettings(){
+    settingsOverlay.classList.add('open');
+    settingsPanel.classList.add('open');
+  }
+  function closeSettings(){
+    settingsOverlay.classList.remove('open');
+    settingsPanel.classList.remove('open');
+  }
+  btnSettings.addEventListener('click', openSettings);
+  settingsOverlay.addEventListener('click', closeSettings);
+  settingsClose.addEventListener('click', closeSettings);
+
+  senSlider.addEventListener('input', function(){
+    const v = parseFloat(this.value);
+    senVal.textContent = v.toFixed(1) + 'x';
+    send({action:'sensitivity', value:v});
+  });
+  scrSlider.addEventListener('input', function(){
+    const v = parseFloat(this.value);
+    scrVal.textContent = v.toFixed(1) + 'x';
+    send({action:'scrollspeed', value:v});
+  });
+  tapToggle.addEventListener('click', function(){
+    tapToClick = !tapToClick;
+    this.classList.toggle('on', tapToClick);
+  });
+})();
+</script>
+</body>
+</html>
