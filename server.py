@@ -32,6 +32,13 @@ from Quartz.CoreGraphics import (
     kCGScrollEventUnitPixel,
 )
 
+# AppKit needed for system-defined media key events (play/pause/next/prev)
+try:
+    from AppKit import NSEvent
+    _APPKIT_OK = True
+except ImportError:
+    _APPKIT_OK = False
+
 HTTP_PORT = 8080
 WS_PORT = 8081
 
@@ -130,9 +137,18 @@ def scroll(dx, dy):
 
 
 def run_applescript(script):
-    """Run an AppleScript command via osascript (reliable for system-level actions)."""
+    """Run an AppleScript snippet via osascript.
+
+    Each non-blank line is passed as its own -e flag so that multi-line
+    scripts (with if/then/else blocks etc.) work correctly.
+    """
+    args = ["osascript"]
+    for line in script.split("\n"):
+        line = line.strip()
+        if line:
+            args.extend(["-e", line])
     subprocess.Popen(
-        ["osascript", "-e", script],
+        args,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -188,6 +204,192 @@ def gesture_show_desktop():
     print("[gesture] Show Desktop")
 
 
+# --- Keyboard input ---
+
+# Special-key name -> macOS virtual key code (for System Events)
+SPECIAL_KEYS = {
+    "return":     36,
+    "enter":      36,
+    "tab":        48,
+    "space":      49,
+    "delete":     51,   # Backspace
+    "backspace":  51,
+    "escape":     53,
+    "esc":        53,
+    "forward_delete": 117,
+    "home":       115,
+    "end":        119,
+    "page_up":    116,
+    "page_down":  121,
+    "left":       123,
+    "right":      124,
+    "down":       125,
+    "up":         126,
+}
+
+# macOS modifier names accepted by AppleScript "using {...}"
+_MODIFIER_NAMES = {
+    "cmd":     "command down",
+    "command": "command down",
+    "ctrl":    "control down",
+    "control": "control down",
+    "alt":     "option down",
+    "opt":     "option down",
+    "option":  "option down",
+    "shift":   "shift down",
+}
+
+
+def _applescript_escape(s):
+    """Escape a string for safe inclusion in an AppleScript double-quoted literal."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def type_text(text):
+    """Type a string of text on the Mac as keystrokes."""
+    if not text:
+        return
+    escaped = _applescript_escape(text)
+    run_applescript(
+        f'tell application "System Events" to keystroke "{escaped}"'
+    )
+
+
+def press_key(key, modifiers=None):
+    """Press a special key (or modified character) on the Mac.
+
+    key: name from SPECIAL_KEYS, or a single character (treated as keystroke).
+    modifiers: list of modifier names (cmd/ctrl/alt/shift).
+    """
+    mods_part = ""
+    if modifiers:
+        mod_terms = []
+        for m in modifiers:
+            term = _MODIFIER_NAMES.get(str(m).lower())
+            if term:
+                mod_terms.append(term)
+        if mod_terms:
+            mods_part = " using {" + ", ".join(mod_terms) + "}"
+
+    key_lower = str(key).lower()
+    if key_lower in SPECIAL_KEYS:
+        code = SPECIAL_KEYS[key_lower]
+        run_applescript(
+            f'tell application "System Events" to key code {code}{mods_part}'
+        )
+    elif len(str(key)) >= 1:
+        # Treat as a literal character (or string) to keystroke. Modifiers
+        # like Cmd+C land here.
+        escaped = _applescript_escape(str(key))
+        run_applescript(
+            f'tell application "System Events" to keystroke "{escaped}"{mods_part}'
+        )
+
+
+# --- Media keys ---
+
+# NX_KEYTYPE_* constants used by macOS for system-defined media events
+NX_KEYTYPE_SOUND_UP = 0
+NX_KEYTYPE_SOUND_DOWN = 1
+NX_KEYTYPE_MUTE = 7
+NX_KEYTYPE_PLAY = 16
+NX_KEYTYPE_NEXT = 17
+NX_KEYTYPE_PREVIOUS = 18
+NX_KEYTYPE_FAST = 19
+NX_KEYTYPE_REWIND = 20
+NX_KEYTYPE_BRIGHTNESS_UP = 2
+NX_KEYTYPE_BRIGHTNESS_DOWN = 3
+
+_NSSystemDefined = 14
+
+
+def _hid_aux_key(key_code):
+    """Post a system-defined HID aux key event (down then up)."""
+    if not _APPKIT_OK:
+        return False
+    for is_down in (True, False):
+        flags = 0xA00 if is_down else 0xB00
+        data1 = (key_code << 16) | ((0xA if is_down else 0xB) << 8)
+        ev = NSEvent.otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2_(
+            _NSSystemDefined,
+            (0, 0),
+            flags,
+            0,
+            0,
+            None,
+            8,
+            data1,
+            -1,
+        )
+        cg_event = ev.CGEvent()
+        CGEventPost(kCGHIDEventTap, cg_event)
+    return True
+
+
+def media_play_pause():
+    if not _hid_aux_key(NX_KEYTYPE_PLAY):
+        # Fallback: AppleScript controlling whichever player is frontmost.
+        run_applescript(
+            'tell application "System Events" to key code 49'
+        )
+    print("[media] Play/Pause")
+
+
+def media_next():
+    if not _hid_aux_key(NX_KEYTYPE_NEXT):
+        run_applescript('tell application "Music" to next track')
+    print("[media] Next")
+
+
+def media_previous():
+    if not _hid_aux_key(NX_KEYTYPE_PREVIOUS):
+        run_applescript('tell application "Music" to previous track')
+    print("[media] Previous")
+
+
+def media_volume_up():
+    # AppleScript volume control is the most reliable across machines.
+    run_applescript(
+        'set volume output volume '
+        '((output volume of (get volume settings)) + 6)'
+    )
+    print("[media] Volume Up")
+
+
+def media_volume_down():
+    run_applescript(
+        'set cur to output volume of (get volume settings)\n'
+        'set nv to cur - 6\n'
+        'if nv < 0 then set nv to 0\n'
+        'set volume output volume nv'
+    )
+    print("[media] Volume Down")
+
+
+def media_mute_toggle():
+    run_applescript(
+        'set m to output muted of (get volume settings)\n'
+        'if m then\n'
+        '  set volume without output muted\n'
+        'else\n'
+        '  set volume with output muted\n'
+        'end if'
+    )
+    print("[media] Mute toggle")
+
+
+def media_brightness_up():
+    if not _hid_aux_key(NX_KEYTYPE_BRIGHTNESS_UP):
+        run_applescript('tell application "System Events" to key code 144')
+    print("[media] Brightness Up")
+
+
+def media_brightness_down():
+    if not _hid_aux_key(NX_KEYTYPE_BRIGHTNESS_DOWN):
+        run_applescript('tell application "System Events" to key code 145')
+    print("[media] Brightness Down")
+
+
 async def handle_ws(websocket):
     """Handle a single WebSocket connection from a phone."""
     global sensitivity, scroll_speed
@@ -227,6 +429,30 @@ async def handle_ws(websocket):
                 gesture_launchpad()
             elif action == "show_desktop":
                 gesture_show_desktop()
+            # Keyboard
+            elif action == "type_text":
+                type_text(msg.get("text", ""))
+            elif action == "key":
+                press_key(msg.get("key", ""), msg.get("modifiers"))
+            # Media
+            elif action == "media":
+                cmd = msg.get("cmd")
+                if cmd == "play_pause":
+                    media_play_pause()
+                elif cmd == "next":
+                    media_next()
+                elif cmd == "previous":
+                    media_previous()
+                elif cmd == "volume_up":
+                    media_volume_up()
+                elif cmd == "volume_down":
+                    media_volume_down()
+                elif cmd == "mute":
+                    media_mute_toggle()
+                elif cmd == "brightness_up":
+                    media_brightness_up()
+                elif cmd == "brightness_down":
+                    media_brightness_down()
     except websockets.exceptions.ConnectionClosed:
         pass
     print("[ws] Client disconnected")

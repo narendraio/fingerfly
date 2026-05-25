@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>FingerFly</title>
@@ -30,6 +30,13 @@
   .logo{width:28px;height:28px;border-radius:6px;background:var(--accent);
     display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
   .header h1{font-size:15px;font-weight:600;letter-spacing:.5px}
+  .header-right{display:flex;align-items:center;gap:12px}
+  .icon-btn{
+    background:transparent;border:none;color:var(--text-dim);
+    font-size:18px;cursor:pointer;padding:4px 6px;
+    font-family:inherit;line-height:1;
+  }
+  .icon-btn:active{color:var(--accent)}
   .status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)}
   .status-dot{
     width:8px;height:8px;border-radius:50%;background:var(--red);
@@ -41,6 +48,26 @@
     animation:pulse 2s infinite;
   }
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+  /* Mode tabs */
+  .tabs{
+    display:flex;background:var(--surface);
+    border-bottom:1px solid var(--border);flex-shrink:0;
+  }
+  .tab{
+    flex:1;padding:12px 0;font-size:11px;font-weight:600;letter-spacing:1.5px;
+    color:var(--text-dim);background:transparent;border:none;cursor:pointer;
+    font-family:inherit;border-bottom:2px solid transparent;
+    transition:color .15s,border-color .15s;
+  }
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab:active{background:rgba(139,92,246,.08)}
+
+  /* Views — only the active one is displayed */
+  .view{flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0}
+  body[data-mode="trackpad"] .view-trackpad{display:flex}
+  body[data-mode="keyboard"] .view-keyboard{display:flex}
+  body[data-mode="media"]    .view-media{display:flex}
 
   /* Trackpad */
   .trackpad{
@@ -75,7 +102,6 @@
   }
   .gesture-toast.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
 
-  /* Finger count badge */
   .finger-badge{
     position:absolute;top:14px;right:14px;
     background:var(--surface);border:1px solid var(--border);
@@ -85,7 +111,6 @@
   }
   .finger-badge.visible{opacity:.8}
 
-  /* Touch indicators */
   .touch-dot{
     position:absolute;width:60px;height:60px;border-radius:50%;
     background:rgba(139,92,246,.18);border:1.5px solid rgba(139,92,246,.35);
@@ -99,7 +124,7 @@
   }
   @keyframes ripple-out{to{transform:translate(-50%,-50%) scale(2.5);opacity:0}}
 
-  /* Buttons */
+  /* Bottom button bars (per-view) */
   .buttons{
     display:flex;border-top:1px solid var(--border);flex-shrink:0;
     background:var(--surface);
@@ -112,8 +137,68 @@
     font-family:inherit;
   }
   .btn:active{background:rgba(139,92,246,.15);color:var(--accent)}
-  .btn-settings{max-width:64px;font-size:18px}
   .btn+.btn{border-left:1px solid var(--border)}
+
+  /* Keyboard view */
+  .kb-panel{
+    flex:1;display:flex;flex-direction:column;
+    padding:14px;gap:10px;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .kb-hint{font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase}
+  .kb-input-wrap{position:relative}
+  .kb-input{
+    width:100%;padding:14px 56px 14px 14px;border-radius:10px;
+    background:var(--bg);border:1px solid var(--border);
+    color:var(--text);font-size:15px;font-family:inherit;
+    outline:none;-webkit-user-select:text;user-select:text;
+    caret-color:var(--accent);
+  }
+  .kb-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+  .kb-clear{
+    position:absolute;top:50%;right:8px;transform:translateY(-50%);
+    background:var(--border);color:var(--text-dim);border:none;
+    width:36px;height:30px;border-radius:8px;font-size:11px;font-weight:600;
+    cursor:pointer;font-family:inherit;letter-spacing:.5px;
+  }
+  .kb-clear:active{background:var(--accent);color:#fff}
+  .kb-section{
+    font-size:10px;color:var(--text-dim);letter-spacing:1.5px;
+    text-transform:uppercase;margin-top:6px;
+  }
+  .kb-row{display:flex;gap:6px}
+  .kb-key{
+    flex:1;padding:14px 0;text-align:center;
+    background:var(--surface);border:1px solid var(--border);
+    color:var(--text);border-radius:8px;font-size:13px;font-weight:600;
+    font-family:inherit;letter-spacing:.5px;cursor:pointer;
+    transition:background .1s,color .1s,transform .05s;
+    min-width:0;
+  }
+  .kb-key:active{background:var(--accent);color:#fff;border-color:var(--accent);transform:scale(0.97)}
+  .kb-key.wide{flex:2}
+
+  /* Media view */
+  .media-grid{
+    flex:1;display:grid;
+    grid-template-columns:repeat(3,1fr);
+    grid-auto-rows:1fr;gap:10px;padding:14px;
+    overflow:hidden;
+  }
+  .media-btn{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:6px;background:var(--surface);border:1px solid var(--border);
+    color:var(--text);border-radius:14px;cursor:pointer;
+    font-family:inherit;padding:8px;min-width:0;min-height:0;
+    transition:background .1s,color .1s,border-color .1s,transform .05s;
+  }
+  .media-btn:active{background:var(--accent);color:#fff;border-color:var(--accent);transform:scale(0.97)}
+  .media-btn .ic{font-size:30px;line-height:1;font-weight:300}
+  .media-btn .lbl{font-size:10px;font-weight:600;letter-spacing:1px;color:var(--text-dim)}
+  .media-btn:active .lbl{color:#fff}
+  .media-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .media-btn.primary .lbl{color:rgba(255,255,255,.9)}
+  .media-spacer{visibility:hidden}
 
   /* Settings Panel */
   .settings-overlay{
@@ -155,7 +240,7 @@
   }
 </style>
 </head>
-<body>
+<body data-mode="trackpad">
 
 <!-- Header -->
 <div class="header">
@@ -163,25 +248,122 @@
     <div class="logo">F</div>
     <h1>FingerFly</h1>
   </div>
-  <div class="status">
-    <span id="statusText">Disconnected</span>
-    <div class="status-dot" id="statusDot"></div>
+  <div class="header-right">
+    <button class="icon-btn" id="btnSettings" aria-label="Settings">&#9881;</button>
+    <div class="status">
+      <span id="statusText">Disconnected</span>
+      <div class="status-dot" id="statusDot"></div>
+    </div>
   </div>
 </div>
 
-<!-- Trackpad Surface -->
-<div class="trackpad" id="trackpad">
-  <div class="trackpad-label">FingerFly</div>
-  <div class="scroll-indicator" id="scrollInd">SCROLL</div>
-  <div class="gesture-toast" id="gestureToast"></div>
-  <div class="finger-badge" id="fingerBadge"></div>
+<!-- Mode tabs -->
+<div class="tabs" id="tabs">
+  <button class="tab active" data-mode="trackpad">TRACKPAD</button>
+  <button class="tab" data-mode="keyboard">KEYBOARD</button>
+  <button class="tab" data-mode="media">MEDIA</button>
 </div>
 
-<!-- Bottom Buttons -->
-<div class="buttons">
-  <button class="btn" id="btnLeft">LEFT CLICK</button>
-  <button class="btn btn-settings" id="btnSettings">&#9881;</button>
-  <button class="btn" id="btnRight">RIGHT CLICK</button>
+<!-- TRACKPAD view -->
+<div class="view view-trackpad">
+  <div class="trackpad" id="trackpad">
+    <div class="trackpad-label">FingerFly</div>
+    <div class="scroll-indicator" id="scrollInd">SCROLL</div>
+    <div class="gesture-toast" id="gestureToast"></div>
+    <div class="finger-badge" id="fingerBadge"></div>
+  </div>
+  <div class="buttons">
+    <button class="btn" id="btnLeft">LEFT CLICK</button>
+    <button class="btn" id="btnRight">RIGHT CLICK</button>
+  </div>
+</div>
+
+<!-- KEYBOARD view -->
+<div class="view view-keyboard">
+  <div class="kb-panel">
+    <div class="kb-hint">Type here — keystrokes go to your Mac live</div>
+    <div class="kb-input-wrap">
+      <input id="kbInput" class="kb-input" type="text"
+             autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false"
+             placeholder="Tap and start typing…">
+      <button class="kb-clear" id="kbClear">CLR</button>
+    </div>
+
+    <div class="kb-section">Keys</div>
+    <div class="kb-row">
+      <button class="kb-key" data-key="escape">ESC</button>
+      <button class="kb-key" data-key="tab">TAB</button>
+      <button class="kb-key" data-key="backspace">&#9003;</button>
+      <button class="kb-key" data-key="return">&#8629;</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-key="left">&#8592;</button>
+      <button class="kb-key" data-key="down">&#8595;</button>
+      <button class="kb-key" data-key="up">&#8593;</button>
+      <button class="kb-key" data-key="right">&#8594;</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-key="home">HOME</button>
+      <button class="kb-key" data-key="end">END</button>
+      <button class="kb-key" data-key="page_up">PG UP</button>
+      <button class="kb-key" data-key="page_down">PG DN</button>
+    </div>
+
+    <div class="kb-section">Shortcuts</div>
+    <div class="kb-row">
+      <button class="kb-key" data-combo="cmd,c">&#8984;C</button>
+      <button class="kb-key" data-combo="cmd,v">&#8984;V</button>
+      <button class="kb-key" data-combo="cmd,x">&#8984;X</button>
+      <button class="kb-key" data-combo="cmd,z">&#8984;Z</button>
+      <button class="kb-key" data-combo="cmd,a">&#8984;A</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-combo="cmd,s">&#8984;S</button>
+      <button class="kb-key" data-combo="cmd,t">&#8984;T</button>
+      <button class="kb-key" data-combo="cmd,w">&#8984;W</button>
+      <button class="kb-key" data-combo="cmd,f">&#8984;F</button>
+      <button class="kb-key" data-combo="cmd,shift,z">&#8679;&#8984;Z</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-combo="cmd,space">&#8984; SPACE</button>
+      <button class="kb-key" data-combo="cmd,tab">&#8984; TAB</button>
+      <button class="kb-key wide" data-key="forward_delete">FWD DEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEDIA view -->
+<div class="view view-media">
+  <div class="media-grid">
+    <button class="media-btn" data-media="previous">
+      <span class="ic">&#9664;&#9664;</span><span class="lbl">PREV</span>
+    </button>
+    <button class="media-btn primary" data-media="play_pause">
+      <span class="ic">&#9654;&#10074;&#10074;</span><span class="lbl">PLAY / PAUSE</span>
+    </button>
+    <button class="media-btn" data-media="next">
+      <span class="ic">&#9654;&#9654;</span><span class="lbl">NEXT</span>
+    </button>
+
+    <button class="media-btn" data-media="volume_down">
+      <span class="ic">&#8722;</span><span class="lbl">VOLUME</span>
+    </button>
+    <button class="media-btn" data-media="mute">
+      <span class="ic">&#216;</span><span class="lbl">MUTE</span>
+    </button>
+    <button class="media-btn" data-media="volume_up">
+      <span class="ic">&#43;</span><span class="lbl">VOLUME</span>
+    </button>
+
+    <button class="media-btn" data-media="brightness_down">
+      <span class="ic">&#9728;&#8722;</span><span class="lbl">BRIGHTNESS</span>
+    </button>
+    <div class="media-spacer"></div>
+    <button class="media-btn" data-media="brightness_up">
+      <span class="ic">&#9728;&#43;</span><span class="lbl">BRIGHTNESS</span>
+    </button>
+  </div>
 </div>
 
 <!-- Settings Overlay -->
@@ -206,6 +388,10 @@
     <label>Tap to Click</label>
     <button class="toggle on" id="tapToggle"></button>
   </div>
+  <div class="setting-row">
+    <label>Haptics (Vibrate)</label>
+    <button class="toggle on" id="hapticsToggle"></button>
+  </div>
   <button class="settings-close" id="settingsClose">Done</button>
 </div>
 
@@ -215,6 +401,7 @@
   let ws = null;
   let connected = false;
   let tapToClick = true;
+  let hapticsEnabled = true;
   const touches = {};       // id -> {x, y, startX, startY, startTime, moved}
   let touchCount = 0;
   let maxTouches = 0;
@@ -232,14 +419,14 @@
 
   // --- Multi-finger gesture state ---
   let gestureStartTime = 0;
-  let gestureTotalDx = 0, gestureTotalDy = 0; // accumulated swipe distance for 3+ finger gestures
-  let gestureFired = false;     // only fire one gesture per touch sequence
+  let gestureTotalDx = 0, gestureTotalDy = 0;
+  let gestureFired = false;
   let gestureToastTimer = null;
-  const GESTURE_THRESHOLD = 60; // px of total swipe before gesture triggers
-  // 4-finger pinch
+  const GESTURE_THRESHOLD = 60;
   let pinchStartSpread = 0;
 
   // --- Elements ---
+  const body          = document.body;
   const trackpad      = document.getElementById('trackpad');
   const statusDot     = document.getElementById('statusDot');
   const statusText    = document.getElementById('statusText');
@@ -257,6 +444,16 @@
   const scrSlider     = document.getElementById('scrSlider');
   const scrVal        = document.getElementById('scrVal');
   const tapToggle     = document.getElementById('tapToggle');
+  const hapticsToggle = document.getElementById('hapticsToggle');
+  const tabs          = document.getElementById('tabs');
+  const kbInput       = document.getElementById('kbInput');
+  const kbClear       = document.getElementById('kbClear');
+
+  // --- Haptics helper ---
+  function buzz(ms){
+    if(!hapticsEnabled) return;
+    try{ navigator.vibrate(ms || 12); }catch(_){}
+  }
 
   // --- WebSocket ---
   function connect(){
@@ -289,13 +486,12 @@
     if(gestureToastTimer) clearTimeout(gestureToastTimer);
     gestureToast.textContent = text;
     gestureToast.classList.add('visible');
-    try{ navigator.vibrate(20); }catch(_){}
+    buzz(20);
     gestureToastTimer = setTimeout(() => {
       gestureToast.classList.remove('visible');
     }, 800);
   }
 
-  // --- Finger badge ---
   function updateFingerBadge(count){
     if(count >= 2){
       fingerBadge.textContent = count + ' fingers';
@@ -305,7 +501,6 @@
     }
   }
 
-  // --- Pinch spread calculation ---
   function getTouchSpread(touchList){
     if(touchList.length < 2) return 0;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -377,7 +572,7 @@
     rip.addEventListener('animationend', () => rip.remove());
   }
 
-  // --- Touch events ---
+  // --- Trackpad touch events ---
   trackpad.addEventListener('touchstart', function(e){
     e.preventDefault();
     for(let t of e.changedTouches){
@@ -392,14 +587,11 @@
     if(touchCount > maxTouches) maxTouches = touchCount;
     updateFingerBadge(touchCount);
 
-    // 2-finger = scroll
     if(touchCount === 2 && maxTouches === 2){
       scrolling = true;
       scrollInd.classList.add('visible');
       smoothScrollDx = 0; smoothScrollDy = 0;
     }
-
-    // 3+ fingers = gesture mode — reset gesture tracking
     if(touchCount >= 3){
       scrolling = false;
       scrollInd.classList.remove('visible');
@@ -408,13 +600,9 @@
       gestureFired = false;
       gestureStartTime = Date.now();
     }
-
-    // 4+ fingers — track pinch spread
     if(touchCount >= 4){
       pinchStartSpread = getTouchSpread(e.touches);
     }
-
-    // Reset smooth state on new gesture
     if(touchCount === 1 && !scrolling){
       smoothDx = 0; smoothDy = 0;
     }
@@ -439,7 +627,6 @@
     const dx = dxSum / n;
     const dy = dySum / n;
 
-    // --- 3-finger swipe gestures ---
     if(maxTouches === 3 && touchCount >= 3 && !gestureFired){
       gestureTotalDx += dx;
       gestureTotalDy += dy;
@@ -449,7 +636,6 @@
       if(absDx > GESTURE_THRESHOLD || absDy > GESTURE_THRESHOLD){
         gestureFired = true;
         if(absDx > absDy){
-          // Horizontal swipe
           if(gestureTotalDx > 0){
             send({action:'space_right'});
             showGestureToast('Space >>');
@@ -458,7 +644,6 @@
             showGestureToast('<< Space');
           }
         } else {
-          // Vertical swipe
           if(gestureTotalDy < 0){
             send({action:'mission_control'});
             showGestureToast('Mission Control');
@@ -468,26 +653,22 @@
           }
         }
       }
-      return; // don't send move/scroll during gesture
+      return;
     }
 
-    // --- 4-finger pinch gesture ---
     if(maxTouches >= 4 && touchCount >= 4 && !gestureFired){
       const currentSpread = getTouchSpread(e.touches);
       const delta = currentSpread - pinchStartSpread;
       if(Math.abs(delta) > 80){
         gestureFired = true;
         if(delta < 0){
-          // Pinch in
           send({action:'launchpad'});
           showGestureToast('Launchpad');
         } else {
-          // Pinch out / spread
           send({action:'show_desktop'});
           showGestureToast('Show Desktop');
         }
       }
-      // Also accumulate swipe for 4-finger horizontal swipe (spaces)
       gestureTotalDx += dx;
       gestureTotalDy += dy;
       const absDx = Math.abs(gestureTotalDx);
@@ -505,7 +686,6 @@
       return;
     }
 
-    // --- Normal 2-finger scroll ---
     if(scrolling && maxTouches === 2){
       rawScrollDx += -dx;
       rawScrollDy += -dy;
@@ -513,7 +693,6 @@
       return;
     }
 
-    // --- 1-finger move ---
     if(maxTouches === 1){
       rawDx += dx;
       rawDy += dy;
@@ -534,7 +713,7 @@
             send({action:'click'});
           }
           spawnRipple(t.clientX, t.clientY);
-          try{ navigator.vibrate(10); }catch(_){}
+          buzz(10);
         }
       }
       hideDot(t.identifier);
@@ -575,16 +754,16 @@
   document.addEventListener('gesturechange', e => e.preventDefault());
   document.addEventListener('gestureend', e => e.preventDefault());
 
-  // --- Buttons ---
+  // --- Trackpad bottom buttons ---
   btnLeft.addEventListener('touchstart', function(e){
     e.preventDefault();
     send({action:'click'});
-    try{ navigator.vibrate(10); }catch(_){}
+    buzz(12);
   }, {passive:false});
   btnRight.addEventListener('touchstart', function(e){
     e.preventDefault();
     send({action:'rightclick'});
-    try{ navigator.vibrate(10); }catch(_){}
+    buzz(12);
   }, {passive:false});
 
   // --- Settings ---
@@ -613,6 +792,108 @@
   tapToggle.addEventListener('click', function(){
     tapToClick = !tapToClick;
     this.classList.toggle('on', tapToClick);
+  });
+  hapticsToggle.addEventListener('click', function(){
+    hapticsEnabled = !hapticsEnabled;
+    this.classList.toggle('on', hapticsEnabled);
+    if(hapticsEnabled) buzz(20);
+  });
+
+  // --- Tab switching ---
+  tabs.addEventListener('click', function(e){
+    const tab = e.target.closest('.tab');
+    if(!tab) return;
+    const mode = tab.dataset.mode;
+    if(!mode) return;
+    body.dataset.mode = mode;
+    for(const t of tabs.querySelectorAll('.tab')){
+      t.classList.toggle('active', t === tab);
+    }
+    buzz(8);
+    // When leaving keyboard mode, blur input so the on-screen keyboard hides
+    if(mode !== 'keyboard'){
+      try{ kbInput.blur(); }catch(_){}
+    } else {
+      // Reset diff state so typing starts cleanly
+      kbInput.value = '';
+      lastSent = '';
+      setTimeout(()=>{ try{ kbInput.focus(); }catch(_){} }, 50);
+    }
+  });
+
+  // --- Keyboard view: live diff typing ---
+  let lastSent = '';
+  kbInput.addEventListener('input', function(){
+    const cur = kbInput.value;
+    let i = 0;
+    while(i < lastSent.length && i < cur.length && lastSent[i] === cur[i]) i++;
+    const backspaces = lastSent.length - i;
+    const toAdd = cur.slice(i);
+    for(let j = 0; j < backspaces; j++){
+      send({action:'key', key:'backspace'});
+    }
+    if(toAdd){
+      send({action:'type_text', text: toAdd});
+    }
+    lastSent = cur;
+    if(backspaces || toAdd) buzz(6);
+    // Keep the field from growing unbounded; periodically reset silently.
+    if(cur.length > 80){
+      kbInput.value = '';
+      lastSent = '';
+    }
+  });
+  // Hardware Enter on Bluetooth keyboards or phone "Go" key: send Return.
+  kbInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      send({action:'key', key:'return'});
+      buzz(15);
+    }
+  });
+
+  kbClear.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    kbInput.value = '';
+    lastSent = '';
+    buzz(10);
+    try{ kbInput.focus(); }catch(_){}
+  }, {passive:false});
+
+  // --- Keyboard view: special keys + shortcut combos ---
+  // touchstart with preventDefault keeps the text input focused.
+  function attachKeyButton(el){
+    el.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      const key = el.dataset.key;
+      const combo = el.dataset.combo;
+      if(combo){
+        const parts = combo.split(',').map(s => s.trim()).filter(Boolean);
+        if(parts.length){
+          const target = parts[parts.length - 1];
+          const mods = parts.slice(0, -1);
+          send({action:'key', key: target, modifiers: mods});
+        }
+      } else if(key){
+        send({action:'key', key: key});
+      }
+      buzz(12);
+    }, {passive:false});
+  }
+  document.querySelectorAll('.kb-key').forEach(attachKeyButton);
+
+  // --- Media view buttons ---
+  document.querySelectorAll('.media-btn').forEach(btn => {
+    btn.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      const cmd = btn.dataset.media;
+      if(cmd){
+        send({action:'media', cmd: cmd});
+        buzz(15);
+      }
+    }, {passive:false});
   });
 })();
 </script>
